@@ -1,0 +1,67 @@
+#cloud-config
+final_message: "The system is finally up, after $UPTIME seconds"
+growpart:
+  devices: ['/']
+  mode: auto
+  ignore_growroot_disabled: false
+package_reboot_if_required: true
+package_update: true
+package_upgrade: true
+packages:
+  - docker
+  - docker-engine
+  - docker-compose
+  - firewalld
+  - libselinux-python3
+  - python3
+  - python3-pip
+  - python3-setuptools
+  - yum-cron
+write_files:
+  - content: |
+      #!/bin/bash
+      cd /root/gogs
+      docker-compose pull
+      docker-compose up -d
+    path: /etc/cron.daily/docker-compose-pull
+  - content: |
+      ---
+      networks:
+        common:
+      services:
+        gogs:
+          depends_on:
+            - "mysql"
+          image: "gogs/gogs:latest"
+          networks:
+            - "common"
+          ports:
+            - "80:3000"
+            - "${GOGS_SSH_PORT}:22"
+          restart: "always"
+          volumes:
+            - "gogs_backup:/backup"
+            - "gogs_data:/data"
+        mysql:
+          command: --default-authentication-plugin=mysql_native_password
+          environment:
+            MYSQL_DATABASE: "${GOGS_DB_NAME}"
+            MYSQL_PASSWORD: "${GOGS_DB_PASSWD}"
+            MYSQL_ROOT_PASSWORD: "${GOGS_DB_ROOT_PASSWD}"
+            MYSQL_USER: "${GOGS_DB_USER}"
+          expose:
+            - "3306"
+          image: "mysql:latest"
+          networks:
+            - "common"
+          restart: "always"
+          volumes:
+            - "mysql:/var/lib/mysql"
+      version: "3"
+      volumes:
+        gogs_backup:
+        gogs_data:
+        mysql:
+
+    path: /root/gogs/docker-compose.yml
+
